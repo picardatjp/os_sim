@@ -161,7 +161,7 @@ int main()
                         }
                     }
                     else
-                        std::cout << "couldn't read that :/ try again\n";
+                        std::cout << "couldn't read that, try again\n";
                 }
                 // printProcess(base_operations);
             }
@@ -227,7 +227,7 @@ void loadFile(std::ifstream &f, std::vector<base_operation> &v)
         }
         else
             // should probably return false, saying couldn't load file properly
-            std::cout << "didn't recognize command, rip\n";
+            std::cout << "didn't recognize command\n";
 
         // set the cycle info for base operation
         b.min_cycles = min;
@@ -273,28 +273,29 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
 {
     // flags
     bool r = true;
-    int cnt = 0;
+    int e = 0;
+    // int cnt = 0;
     // go through all PCBs
     for (int i = 0; i < pcbs.size(); i++)
     {
         // if the process id matches the one running on the CPU
         if (pcbs[i].ps == RUN)
         {
-            cnt++;
-            if (cnt >= 2)
-            {
-                std::cout << "\n\n2 prcoesses running at once..\n\n";
-            }
+            // cnt++;
+            // if (cnt >= 2)
+            // {
+            //     std::cout << "\n\n2 prcoesses running at once..\n\n";
+            // }
             // if there are operations remaining in this process
             if (pcbs[i].ops.size() > 0)
             {
                 if (pcbs[i].ops[0].c != FORK)
                 {
                     // if the cycles on this operation is 0
-                    if (pcbs[i].ops[0].cycles == 0)
-                    {
-                        std::cout << "problem!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-                    }
+                    // if (pcbs[i].ops[0].cycles == 0)
+                    // {
+                    //     std::cout << "problem!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+                    // }
                     // one cycle has passed since this operation has been running
                     pcbs[i].ops[0].cycles--;
 
@@ -303,15 +304,15 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                         cpu.curr_cycle_count++;
                         if (rr_q <= cpu.curr_cycle_count)
                         {
-                            std::cout << "round robin\n";
+                            // std::cout << "round robin\n";
                             // cpu.q.push(cpu.q.front());
                             // cpu.q.pop();
                             // next pid in the queue
                             // will the queue ever be empty?
-                            if (cpu.q.empty())
-                            {
-                                std::cout << "q was empty?????????????????????????\n";
-                            }
+                            // if (cpu.q.empty())
+                            // {
+                            //     std::cout << "q was empty?????????????????????????\n";
+                            // }
                             cpu.q.push(cpu.curr_proc_pid);
 
                             cpu.curr_proc_pid = cpu.q.front();
@@ -320,12 +321,12 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                             {
                                 if (cpu.q.back() == pcbs[j].pid)
                                 {
-                                    std::cout << "setting " << pcbs[j].pid << " to READY\n\n";
+                                    // std::cout << "setting " << pcbs[j].pid << " to READY\n\n";
                                     pcbs[j].ps = READY;
                                 }
                                 if (cpu.curr_proc_pid == pcbs[j].pid)
                                 {
-                                    std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
+                                    // std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
                                     pcbs[j].ps = RUN;
                                 }
                             }
@@ -356,17 +357,17 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                         if (pcbs[i].ops[0].c == IO)
                         {
                             pcbs[i].ps = WAIT;
-                            std::cout << "\n\nsetting wait, currPID= " << cpu.curr_proc_pid << " new pid = " << cpu.q.front() << "\n\n";
+                            // std::cout << "\n\nsetting wait, currPID= " << cpu.curr_proc_pid << " new pid = " << cpu.q.front() << "\n\n";
                             if (cpu.q.size() > 0)
                             {
                                 cpu.curr_proc_pid = cpu.q.front();
-                                std::cout << "this should be 1... : " << cpu.curr_proc_pid << "\n\n";
+                                // std::cout << "this should be 1... : " << cpu.curr_proc_pid << "\n\n";
                                 cpu.q.pop();
                                 for (int j = 0; j < pcbs.size(); j++)
                                 {
                                     if (cpu.curr_proc_pid == pcbs[j].pid)
                                     {
-                                        std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
+                                        // std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
                                         pcbs[j].ps = RUN;
                                         break;
                                     }
@@ -383,29 +384,29 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                 }
                 else
                 {
-                    std::cout << "\nforking..\n";
+                    std::cout << "\nforking process " << pcbs[i].pid << "\n";
                     // delete the fork call so not infinite loop
                     pcbs[i].ops.erase(pcbs[i].ops.begin());
                     // PCB starts out as NEW when made
-                    std::cout << "spot 1\n";
+                    // std::cout << "spot 1\n";
                     PCB p;
                     p.ps = NEW;
                     // set pid to unique int
                     p.pid = pcbs.size();
-                    std::cout << "spot 2";
+                    // std::cout << "spot 2";
                     // go through each base operation adding it to the operations of the new PCB
                     for (int j = 0; j < pcbs[i].ops.size(); j++)
                     {
-                        std::cout << "spot 3";
+                        // std::cout << "spot 3";
                         operation o;
                         o.is_locked = pcbs[i].ops[j].is_locked;
                         o.c = pcbs[i].ops[j].c;
                         o.cycles = pcbs[i].ops[j].cycles;
-                        std::cout << "spot 4";
+                        // std::cout << "spot 4";
                         // add operation to list of operations within the PCB
                         p.ops.push_back(o);
                     }
-                    std::cout << "spot 5";
+                    // std::cout << "spot 5";
                     // add the PCB to the list of PCBs
                     pcbs.push_back(p);
                 }
@@ -414,11 +415,10 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
             // could just be else
             if (pcbs[i].ops.size() <= 0)
             {
-                std::cout << "\n\n\n\nthe else\n\n\n\n";
+                // std::cout << "\n\n\n\nthe else\n\n\n\n";
                 // no operations left means we terminate the process
                 pcbs[i].ps = EXIT;
                 // if there is another process after this we set the cpu to run it
-                //  really should check if pcbs[i].ps == RUN, or do next in run q, idk yet
                 if ((i < (pcbs.size() - 1)) && (cpu.q.size() > 0))
                 {
                     cpu.q.pop();
@@ -427,7 +427,7 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                     {
                         if (cpu.curr_proc_pid == pcbs[j].pid)
                         {
-                            std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
+                            // std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
                             pcbs[j].ps = RUN;
                             break;
                         }
@@ -459,39 +459,39 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
         }
         else if (pcbs[i].ps == WAIT)
         {
-            std::cout << "setting " << pcbs[i].pid << " to exit\n";
+            // std::cout << "setting " << pcbs[i].pid << " to exit\n";
             pcbs[i].ps = EXIT;
         }
         // if we have a new process, do a bunch of pretend stuff and then make it READY
         if (pcbs[i].ps == NEW)
         {
-            std::cout << "spot 80";
+            // std::cout << "spot 80";
             pcbs[i].ps = READY;
             cpu.q.push(pcbs[i].pid);
-            // if (cpu.curr_proc_pid == -1)
-            // {
-            //     cpu.curr_proc_pid = cpu.q.front();
-            //     cpu.q.pop();
-            //     pcbs[i].ps = RUN;
-            // }
         }
         if (cpu.curr_proc_pid == -1 && cpu.q.size() > 0)
         {
-            std::cout << "pid=-1 and run q not empty";
+            // std::cout << "pid=-1 and run q not empty";
             cpu.curr_proc_pid = cpu.q.front();
             cpu.q.pop();
             for (int j = 0; j < pcbs.size(); j++)
             {
                 if (cpu.curr_proc_pid == pcbs[j].pid)
                 {
-                    std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
+                    // std::cout << "setting " << pcbs[j].pid << " to RUN\n\n";
                     pcbs[j].ps = RUN;
                     break;
                 }
             }
         }
-        cnt = 0;
+        if (pcbs[i].ps == EXIT)
+        {
+            e++;
+        }
+        // cnt = 0;
     }
+    if (e >= pcbs.size())
+        r = false;
     // true -> processes remain
     // false -> no more processes remain
     if (!r)
@@ -503,9 +503,6 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
     }
     return r;
 }
-
-// First come first serve
-// Round Robin
 
 void printq(std::queue<int> q)
 {
