@@ -2,13 +2,14 @@
 #include <fstream>
 #include <vector>
 #include <ctime>
+#include <cstring>
 #include "os.hpp"
 
 // declarations
 void loadFile(std::ifstream &f, std::vector<base_operation> &v);
 void printpcb(PCB &p);
 void createProcesses(std::vector<PCB> &p, int n);
-bool runCycle(std::vector<PCB> &pcbs, CPU &cpu);
+bool runCycle(std::vector<PCB> &pcbs, CPU &cpu, memory &mm, memory &vm);
 void printq(std::queue<int> q);
 
 // main????
@@ -25,6 +26,11 @@ int main()
         CPU cpu;
         cpu.curr_proc_pid = -1;
         cpu.curr_cycle_count = 0;
+        cpu.total_mem = 0;
+        memory mm;
+        memset(&mm.m, -1, sizeof(mm.m));
+        memory vm;
+        memset(&vm.m, -1, sizeof(vm.m));
         std::ifstream myFile;
         // the commands and cycle info
         std::vector<base_operation> base_operations;
@@ -59,16 +65,31 @@ int main()
                     {
                         int ra = 0;
                         if (base_operations[j].c != FORK)
+                        {
                             ra = rand() % (base_operations[j].max_cycles - base_operations[j].min_cycles);
+                        }
                         // int r = randomize(rd) % (base_operations[j].max_cycles - base_operations[j].min_cycles);
                         operation o;
                         o.is_locked = false;
                         // they have same command, just different cycle durations
                         o.c = base_operations[j].c;
                         o.cycles = ra + base_operations[j].min_cycles;
+                        // now only to worry about the fork command FUCKKKKKK
+                        for (int k = 0; k < MAX_MEM; k++)
+                        {
+                            if (vm.m[k] == -1)
+                            {
+                                o.p_index = k;
+                                vm.m[k] = k;
+                                break;
+                            }
+                        }
                         // add operation to list of operations within the PCB
                         p.ops.push_back(o);
                     }
+                    // magic number haha
+                    int rb = rand() % (100);
+                    p.mem_req = rb;
                     // add the PCB to the list of PCBs
                     pcbs.push_back(p);
                 }
@@ -88,7 +109,7 @@ int main()
                 // display info menu while processes are running
                 while (running_processes)
                 {
-                    std::cout << "\nPlease choose one of the following:\n[1]: Run x cycles.\n[2]: View current processes in a given state.\n[3]: View cpu queue.\n[4]: Quit\n";
+                    std::cout << "\nPlease choose one of the following:\n[1]: Run x cycles.\n[2]: View current processes in a given state.\n[3]: View cpu queue.\n[4]: View Memory Usage.\n[5]: Quit\n";
                     std::cin >> input;
                     // user wants to run x cycles
                     if (input == 1)
@@ -99,7 +120,7 @@ int main()
                         for (int i = 0; i < input; i++)
                         {
                             // if runCycle == false we know there are no more processes to run so we can exit this menu
-                            if (!runCycle(pcbs, cpu))
+                            if (!runCycle(pcbs, cpu, mm, vm))
                             {
                                 running_processes = false;
                                 std::cout << "All processes have ended.\n";
@@ -148,10 +169,14 @@ int main()
                         printq(cpu.q);
                         std::cout << "current process id running: " << cpu.curr_proc_pid << "\n";
                     }
-                    // we set the running flags to false to exit program
                     else if (input == 4)
                     {
-                        std::cout << "are you sure?\n[1]: yes, exit.\n[2]: no, don't exit.\n";
+                        std::cout << "Memory Available: " << (MAX_MEM - cpu.total_mem) << "MB\n";
+                    }
+                    // we set the running flags to false to exit program
+                    else if (input == 5)
+                    {
+                        std::cout << "are you sure?\n[1]: exit.\n[2]: stay.\n";
                         std::cin >> input;
                         if (input == 1)
                         {
@@ -161,7 +186,7 @@ int main()
                         }
                     }
                     else
-                        std::cout << "couldn't read that, try again\n";
+                        std::cout << "couldn't read that :/ try again\n";
                 }
                 // printProcess(base_operations);
             }
@@ -174,7 +199,7 @@ int main()
         // set running flag to false
         else if (input == 2)
         {
-            std::cout << "are you sure?\n[1]: yes, exit.\n[2]: no, don't exit.\n";
+            std::cout << "are you sure?\n[1]: exit.\n[2]: stay.\n";
             std::cin >> input;
             if (input == 1)
             {
@@ -227,7 +252,7 @@ void loadFile(std::ifstream &f, std::vector<base_operation> &v)
         }
         else
             // should probably return false, saying couldn't load file properly
-            std::cout << "didn't recognize command\n";
+            std::cout << "didn't recognize command, rip\n";
 
         // set the cycle info for base operation
         b.min_cycles = min;
@@ -256,6 +281,8 @@ void printpcb(PCB &p)
             std::cout << "FORK : \t";
         std::cout << "\tcycles remaining -> " << o.cycles << "\n";
     }
+    // static mem not including dynamic, should fix
+    std::cout << "Memory usage: " << p.mem_req << "\n";
     std::cout << "----------------------\n";
 }
 
@@ -269,19 +296,19 @@ void createProcesses(std::vector<PCB> &p, int n)
 // runs a single cycle on the CPU
 // round robin adds one when RUNNING process gets changed to a process later in the pcbs array, ex. P0 was running now its P1, it goes over it again and does an extra cycle
 // not gonna fix it
-bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
+bool runCycle(std::vector<PCB> &pcbs, CPU &cpu, memory &mm, memory &vm)
 {
     // flags
     bool r = true;
-    int e = 0;
-    // int cnt = 0;
+    int cnt = 0;
+    int exit_cnt = 0;
     // go through all PCBs
     for (int i = 0; i < pcbs.size(); i++)
     {
         // if the process id matches the one running on the CPU
         if (pcbs[i].ps == RUN)
         {
-            // cnt++;
+            cnt++;
             // if (cnt >= 2)
             // {
             //     std::cout << "\n\n2 prcoesses running at once..\n\n";
@@ -352,11 +379,27 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                     // if the operation has no more cycles to be run
                     if (pcbs[i].ops[0].cycles <= 0)
                     {
+                        // clear page, clear frame, clear page table
+                        vm.m[pcbs[i].ops[0].p_index] = -1;
+
+                        for (int k = 0; k < pcbs[i].pt.size(); k++)
+                        {
+                            if (pcbs[i].pt[k].first == pcbs[i].ops[0].p_index)
+                            {
+                                mm.m[pcbs[i].pt[k].second] = -1;
+                                pcbs[i].pt.erase(pcbs[i].pt.begin() + k);
+                                break;
+                            }
+                        }
                         // we remove the operation from the list of operations in this process
                         pcbs[i].ops.erase(pcbs[i].ops.begin());
+                        cpu.total_mem--;
                         if (pcbs[i].ops[0].c == IO)
                         {
                             pcbs[i].ps = WAIT;
+                            // remove the process from memory when in waiting
+                            cpu.total_mem -= pcbs[i].mem_req;
+                            // check if q is empty before calling first()
                             // std::cout << "\n\nsetting wait, currPID= " << cpu.curr_proc_pid << " new pid = " << cpu.q.front() << "\n\n";
                             if (cpu.q.size() > 0)
                             {
@@ -384,7 +427,7 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                 }
                 else
                 {
-                    std::cout << "\nforking process " << pcbs[i].pid << "\n";
+                    // std::cout << "\nforking..\n";
                     // delete the fork call so not infinite loop
                     pcbs[i].ops.erase(pcbs[i].ops.begin());
                     // PCB starts out as NEW when made
@@ -393,6 +436,8 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                     p.ps = NEW;
                     // set pid to unique int
                     p.pid = pcbs.size();
+                    // add memory requirement
+                    p.mem_req = rand() % 100;
                     // std::cout << "spot 2";
                     // go through each base operation adding it to the operations of the new PCB
                     for (int j = 0; j < pcbs[i].ops.size(); j++)
@@ -413,12 +458,13 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
             }
             // we did not run a cycle because there were no operations to run
             // could just be else
-            if (pcbs[i].ops.size() <= 0)
+            else
             {
                 // std::cout << "\n\n\n\nthe else\n\n\n\n";
                 // no operations left means we terminate the process
                 pcbs[i].ps = EXIT;
                 // if there is another process after this we set the cpu to run it
+                //  really should check if pcbs[i].ps == RUN, or do next in run q, idk yet
                 if ((i < (pcbs.size() - 1)) && (cpu.q.size() > 0))
                 {
                     cpu.q.pop();
@@ -434,26 +480,53 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                     }
                 }
                 else
+                {
                     // no more processes left to run. again, should check q not this
                     r = false;
+                    // std::cout << "\nr was set to false in teh else\n";
+                }
             }
         }
         // every other process that operations, and the first one is WAIT
         // WAITING processes should advance even when not running on CPU
         if (pcbs[i].ops.size() > 0 && pcbs[i].ps == WAIT)
         {
+
             // if the first operation has cycles, we remove one
-            if (pcbs[i].ops[0].cycles > 1)
+            // this is happening regardless of round robin??? nevermind...
+            if (pcbs[i].ops[0].cycles > 1 && pcbs[i].ops[0].c == IO)
                 pcbs[i].ops[0].cycles--;
             else
             {
                 // no more cyclesin operation = remove operation
                 // should check if next operation is IO, then put ps into WAIT or CALC or FORK and put it into READY
-                pcbs[i].ops.erase(pcbs[i].ops.begin());
-                if (pcbs[i].ops[0].c == CALCULATE || pcbs[i].ops[0].c == FORK)
+
+                if (pcbs[i].ops[0].c == IO)
                 {
-                    pcbs[i].ps = READY;
-                    cpu.q.push(pcbs[i].pid);
+                    vm.m[pcbs[i].ops[0].p_index] = -1;
+
+                    for (int k = 0; k < pcbs[i].pt.size(); k++)
+                    {
+                        if (pcbs[i].pt[k].first == pcbs[i].ops[0].p_index)
+                        {
+                            mm.m[pcbs[i].pt[k].second] = -1;
+                            pcbs[i].pt.erase(pcbs[i].pt.begin() + k);
+                            break;
+                        }
+                    }
+                    pcbs[i].ops.erase(pcbs[i].ops.begin());
+                    cpu.total_mem--;
+                }
+                else
+                {
+                    if (pcbs[i].mem_req <= (MAX_MEM - cpu.total_mem))
+                    {
+                        pcbs[i].ps = READY;
+                        cpu.q.push(pcbs[i].pid);
+                        cpu.total_mem += pcbs[i].mem_req;
+
+                        // move pages to memory? another day
+                    }
                 }
             }
         }
@@ -466,12 +539,48 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
         if (pcbs[i].ps == NEW)
         {
             // std::cout << "spot 80";
-            pcbs[i].ps = READY;
-            cpu.q.push(pcbs[i].pid);
+            // if the required memory for the new process is less than the amount available
+            // + 1 for atleast one page maybe need to change if already has page in memory?
+            if ((pcbs[i].mem_req + 1) < (MAX_MEM - cpu.total_mem))
+            {
+                // we can add it to the ready queue
+                pcbs[i].ps = READY;
+                cpu.q.push(pcbs[i].pid);
+                for (int k = 0; k < pcbs[i].ops.size(); k++)
+                {
+                    // add all pages to frames if there is memory to do so
+                    if (cpu.total_mem < MAX_MEM)
+                    {
+                        int sl = -1;
+                        // find first available frame
+                        for (int l = 0; l < MAX_MEM; l++)
+                        {
+                            if (mm.m[l] == -1)
+                            {
+                                sl = l;
+                                break;
+                            }
+                        }
+                        // add page,frame relationship to pcb page table
+                        pcbs[i].pt.push_back(std::pair<int, int>(pcbs[i].ops[k].p_index, sl));
+                        // 1 page = 1 MB
+                        cpu.total_mem++;
+                    }
+                    else
+                        break;
+                }
+                cpu.total_mem += pcbs[i].mem_req;
+            }
+            // if (cpu.curr_proc_pid == -1)
+            // {
+            //     cpu.curr_proc_pid = cpu.q.front();
+            //     cpu.q.pop();
+            //     pcbs[i].ps = RUN;
+            // }
         }
         if (cpu.curr_proc_pid == -1 && cpu.q.size() > 0)
         {
-            // std::cout << "pid=-1 and run q not empty";
+            // std::cout << "pid=-1 and ready q not empty\n";
             cpu.curr_proc_pid = cpu.q.front();
             cpu.q.pop();
             for (int j = 0; j < pcbs.size(); j++)
@@ -484,13 +593,13 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
                 }
             }
         }
+        cnt = 0;
         if (pcbs[i].ps == EXIT)
         {
-            e++;
+            exit_cnt++;
         }
-        // cnt = 0;
     }
-    if (e >= pcbs.size())
+    if (exit_cnt >= pcbs.size())
         r = false;
     // true -> processes remain
     // false -> no more processes remain
@@ -503,6 +612,9 @@ bool runCycle(std::vector<PCB> &pcbs, CPU &cpu)
     }
     return r;
 }
+
+// First come first serve
+// Round Robin
 
 void printq(std::queue<int> q)
 {
